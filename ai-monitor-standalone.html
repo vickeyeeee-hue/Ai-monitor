@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#06b6d4">
+    <title>AI Market Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;AI Monitor&quot;,&quot;short_name&quot;:&quot;AI Monitor&quot;,&quot;description&quot;:&quot;Track AI news&quot;,&quot;start_url&quot;:&quot;/&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#0f172a&quot;,&quot;theme_color&quot;:&quot;#06b6d4&quot;}">
+</head>
+<body class="bg-slate-950 text-slate-100">
+    <div id="app"></div>
+
+    <script>
+        // App Data
+        const newsData = [
+            {
+                id: 1,
+                company: 'OpenAI',
+                title: 'OpenAI Releases GPT-4.5 with Improved Reasoning',
+                category: 'Product Launch',
+                timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+                source: 'TechCrunch',
+                impact: 'high',
+                description: 'New model shows 40% improvement in reasoning tasks and scientific problem-solving.'
+            },
+            {
+                id: 2,
+                company: 'Google',
+                title: 'Google Announces $2B Investment in AI Safety',
+                category: 'Funding',
+                timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
+                source: 'Reuters',
+                impact: 'medium',
+                description: 'Major commitment to responsible AI development across all divisions.'
+            },
+            {
+                id: 3,
+                company: 'Anthropic',
+                title: 'Anthropic Partners with AWS for Cloud Infrastructure',
+                category: 'Partnership',
+                timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
+                source: 'Bloomberg',
+                impact: 'high',
+                description: 'Strategic partnership to enhance model deployment and research capabilities.'
+            },
+            {
+                id: 4,
+                company: 'Meta',
+                title: 'New EU Regulations Impact Meta AI Training Practices',
+                category: 'Regulatory',
+                timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
+                source: 'The Verge',
+                impact: 'medium',
+                description: 'European AI Act requires changes to data practices for foundation models.'
+            },
+            {
+                id: 5,
+                company: 'Microsoft',
+                title: 'Microsoft Appoints New Chief AI Officer',
+                category: 'Executive',
+                timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000),
+                source: 'VentureBeat',
+                impact: 'low',
+                description: 'Leadership change signals continued focus on enterprise AI solutions.'
+            },
+            {
+                id: 6,
+                company: 'xAI',
+                title: 'xAI Achieves Breakthrough in Multimodal Understanding',
+                category: 'Research',
+                timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
+                source: 'ArXiv',
+                impact: 'medium',
+                description: 'New research paper demonstrates advances in reasoning across text and images.'
+            },
+            {
+                id: 7,
+                company: 'Mistral',
+                title: 'Mistral Raises $200M Series B at $2B Valuation',
+                category: 'Funding',
+                timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000),
+                source: 'Crunchbase',
+                impact: 'high',
+                description: 'European AI startup accelerates product development and market expansion.'
+            }
+        ];
+
+        const companies = ['All', 'OpenAI', 'Google', 'Anthropic', 'Meta', 'Microsoft', 'xAI', 'Mistral'];
+        const categories = ['All', 'Product Launch', 'Funding', 'Partnership', 'Regulatory', 'Executive', 'Research'];
+
+        // App State
+        let state = {
+            searchTerm: '',
+            selectedCompany: 'All',
+            selectedCategory: 'All',
+            readNews: JSON.parse(localStorage.getItem('readNews') || '{}'),
+            settings: JSON.parse(localStorage.getItem('settings') || '{}'),
+            showSettings: false,
+            showMobileMenu: false
+        };
+
+        // Helper Functions
+        function formatTime(timestamp) {
+            const now = new Date();
+            const diffMs = now - timestamp;
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffHours < 1) return 'Just now';
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 7) return `${diffDays}d ago`;
+            return timestamp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function getCompanyColor(company) {
+            const colors = {
+                'OpenAI': 'from-emerald-600 to-emerald-700',
+                'Google': 'from-blue-600 to-blue-700',
+                'Anthropic': 'from-purple-600 to-purple-700',
+                'Meta': 'from-pink-600 to-pink-700',
+                'Microsoft': 'from-cyan-600 to-cyan-700',
+                'xAI': 'from-orange-600 to-orange-700',
+                'Mistral': 'from-indigo-600 to-indigo-700',
+            };
+            return colors[company] || 'from-gray-600 to-gray-700';
+        }
+
+        function getImpactColor(impact) {
+            const colors = {
+                'high': 'bg-red-900/30 border-red-700/50 text-red-300',
+                'medium': 'bg-yellow-900/30 border-yellow-700/50 text-yellow-300',
+                'low': 'bg-blue-900/30 border-blue-700/50 text-blue-300'
+            };
+            return colors[impact] || 'bg-gray-900/30';
+        }
+
+        function getFilteredNews() {
+            return newsData.filter(item => {
+                let match = true;
+                if (state.selectedCompany !== 'All') match = match && item.company === state.selectedCompany;
+                if (state.selectedCategory !== 'All') match = match && item.category === state.selectedCategory;
+                if (state.searchTerm) {
+                    const search = state.searchTerm.toLowerCase();
+                    match = match && (item.title.toLowerCase().includes(search) || item.description.toLowerCase().includes(search));
+                }
+                return match;
+            }).sort((a, b) => b.timestamp - a.timestamp);
+        }
+
+        // Event Handlers
+        function markAsRead(id) {
+            state.readNews[id] = true;
+            localStorage.setItem('readNews', JSON.stringify(state.readNews));
+            render();
+        }
+
+        function toggleSetting(key) {
+            state.settings[key] = !state.settings[key];
+            localStorage.setItem('settings', JSON.stringify(state.settings));
+            render();
+        }
+
+        // Render Function
+        function render() {
+            const filteredNews = getFilteredNews();
+            const unreadCount = filteredNews.filter(item => !state.readNews[item.id]).length;
+
+            document.getElementById('app').innerHTML = `
+                <div class="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col">
+                    <!-- Header -->
+                    <div class="sticky top-0 z-50 border-b border-slate-800/50 backdrop-blur-md bg-slate-950/80">
+                        <div class="px-4 sm:px-6 py-4 sm:py-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex-shrink-0">
+                                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7H5v12h8V7zm6-4h-1v16h1V3z"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <h1 class="text-xl sm:text-3xl font-bold text-white tracking-tight">AI Monitor</h1>
+                                        <p class="text-xs sm:text-sm text-slate-400 hidden sm:block">Track news that moves the market</p>
+                                    </div>
+                                </div>
+                                <button onclick="state.showMobileMenu = !state.showMobileMenu; render();" class="p-2 hover:bg-slate-800 rounded-lg transition-colors sm:hidden">
+                                    <svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- Search -->
+                            <div class="relative mb-3">
+                                <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                                <input
+                                    type="text"
+                                    placeholder="Search news..."
+                                    value="${state.searchTerm}"
+                                    onchange="state.searchTerm = this.value; render();"
+                                    oninput="state.searchTerm = this.value; render();"
+                                    class="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
+                                />
+                            </div>
+
+                            <!-- Filters Desktop -->
+                            <div class="hidden sm:flex gap-3">
+                                <select onchange="state.selectedCompany = this.value; render();" class="px-3 py-2 text-sm bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500/50">
+                                    ${companies.map(c => `<option value="${c}" ${state.selectedCompany === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                </select>
+                                <select onchange="state.selectedCategory = this.value; render();" class="px-3 py-2 text-sm bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500/50">
+                                    ${categories.map(c => `<option value="${c}" ${state.selectedCategory === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                </select>
+                                <button onclick="state.showSettings = !state.showSettings; render();" class="px-3 py-2 text-sm bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100 hover:bg-slate-800 transition-all">⚙️ Settings</button>
+                            </div>
+
+                            <!-- Mobile Menu -->
+                            ${state.showMobileMenu ? `
+                                <div class="sm:hidden mt-4 space-y-3 pb-3 border-t border-slate-700/50 pt-3">
+                                    <select onchange="state.selectedCompany = this.value; render();" class="w-full px-3 py-2 text-sm bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100">
+                                        ${companies.map(c => `<option value="${c}" ${state.selectedCompany === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                    </select>
+                                    <select onchange="state.selectedCategory = this.value; render();" class="w-full px-3 py-2 text-sm bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100">
+                                        ${categories.map(c => `<option value="${c}" ${state.selectedCategory === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                    </select>
+                                    <button onclick="state.showSettings = !state.showSettings; render();" class="w-full px-4 py-2 text-sm bg-slate-800/50 border border-slate-700/50 rounded-lg text-slate-100 hover:bg-slate-800">⚙️ Settings</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Settings Panel -->
+                    ${state.showSettings ? `
+                        <div class="border-b border-slate-800/50 bg-slate-900/50">
+                            <div class="px-4 sm:px-6 py-6 space-y-4">
+                                <h3 class="text-sm font-semibold text-slate-100">🔔 Notification Settings</h3>
+                                <label class="flex items-center gap-3 text-slate-300 cursor-pointer">
+                                    <input type="checkbox" ${state.settings.browserNotif ? 'checked' : ''} onchange="toggleSetting('browserNotif');" class="w-4 h-4 rounded">
+                                    <span class="text-sm">Browser notifications</span>
+                                </label>
+                                <label class="flex items-center gap-3 text-slate-300 cursor-pointer">
+                                    <input type="checkbox" ${state.settings.emailDigest ? 'checked' : ''} onchange="toggleSetting('emailDigest');" class="w-4 h-4 rounded">
+                                    <span class="text-sm">Daily email digest</span>
+                                </label>
+                                <label class="flex items-center gap-3 text-slate-300 cursor-pointer">
+                                    <input type="checkbox" ${state.settings.highImpactOnly ? 'checked' : ''} onchange="toggleSetting('highImpactOnly');" class="w-4 h-4 rounded">
+                                    <span class="text-sm">Only high-impact news</span>
+                                </label>
+                                <button onclick="state.showSettings = false; render();" class="px-4 py-2 text-sm bg-cyan-600/20 border border-cyan-500/50 rounded-lg text-cyan-300 hover:bg-cyan-600/30">Close</button>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Main Content -->
+                    <div class="px-4 sm:px-6 py-6 sm:py-8 flex-1">
+                        ${filteredNews.length === 0 ? `
+                            <div class="text-center py-12">
+                                <p class="text-sm sm:text-base text-slate-400">No news found matching your filters</p>
+                            </div>
+                        ` : `
+                            <div class="space-y-3 sm:space-y-4">
+                                ${filteredNews.map(item => `
+                                    <div onclick="markAsRead(${item.id});" class="p-4 sm:p-6 rounded-lg border transition-all cursor-pointer ${
+                                        state.readNews[item.id]
+                                            ? 'bg-slate-800/30 border-slate-700/30 opacity-75'
+                                            : 'bg-slate-800/60 border-slate-700/50 hover:border-cyan-600/50 hover:bg-slate-800/80'
+                                    }">
+                                        <div class="flex gap-3 sm:gap-4">
+                                            <div class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gradient-to-br ${getCompanyColor(item.company)} flex items-center justify-center">
+                                                <span class="text-xs font-bold text-white">${item.company.substring(0, 2).toUpperCase()}</span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <h3 class="text-sm sm:text-lg font-semibold ${state.readNews[item.id] ? 'text-slate-400' : 'text-slate-100'}">${item.title}</h3>
+                                                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                                    <span class="text-xs font-medium text-slate-400">${item.company}</span>
+                                                    <span class="text-xs text-slate-500">•</span>
+                                                    <span class="text-xs text-slate-500">${formatTime(item.timestamp)}</span>
+                                                </div>
+                                                <p class="text-xs sm:text-sm leading-relaxed mt-2 ${state.readNews[item.id] ? 'text-slate-500' : 'text-slate-300'}">${item.description}</p>
+                                                <div class="flex items-center gap-2 mt-3 flex-wrap">
+                                                    <span class="px-2 sm:px-3 py-1 rounded-full text-xs font-medium border ${getImpactColor(item.impact)}">${item.impact.charAt(0).toUpperCase() + item.impact.slice(1)}</span>
+                                                    <span class="px-2 sm:px-3 py-1 rounded-full text-xs font-medium bg-slate-700/40 border border-slate-600/50 text-slate-300">${item.category}</span>
+                                                </div>
+                                            </div>
+                                            ${!state.readNews[item.id] ? '<div class="flex-shrink-0 w-2 h-2 bg-cyan-500 rounded-full mt-2"></div>' : ''}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `}
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="border-t border-slate-800/50 mt-8 sm:mt-12">
+                        <div class="px-4 sm:px-6 py-6 text-center text-xs sm:text-sm text-slate-500">
+                            <p>Showing ${filteredNews.length} of ${newsData.length} news items</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initial Render
+        render();
+    </script>
+</body>
+</html>
